@@ -32,6 +32,11 @@
         <div id="result-formula" class="muted small"></div>
         <div class="result-actions">
           <input id="note" type="text" placeholder="Note (optional)" />
+          <label class="checkbox-label">
+            <input id="timestamp-toggle" type="checkbox" />
+            <span>Custom time</span>
+          </label>
+          <input id="timestamp-input" type="datetime-local" hidden />
           <button id="save" type="button" class="primary">Save reading</button>
           <button id="discard" type="button" class="ghost">Discard</button>
         </div>
@@ -58,8 +63,22 @@
 
   <footer class="bar footer">
     <button id="export" type="button" class="ghost">Export CSV</button>
+    <button id="import" type="button" class="ghost">Import CSV</button>
+    <input id="import-input" type="file" accept=".csv" hidden />
     <button id="clear-all" type="button" class="ghost danger">Clear all</button>
   </footer>
+
+  <div id="import-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Import CSV</h2>
+      <p class="muted small">Preview first 5 rows:</p>
+      <div id="import-preview" class="import-preview"></div>
+      <div class="modal-actions">
+        <button id="import-confirm" type="button" class="primary">Confirm Import</button>
+        <button id="import-cancel" type="button" class="ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

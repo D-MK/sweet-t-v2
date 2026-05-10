@@ -65,3 +65,51 @@ export async function getReadingsSince(sinceTs) {
   const all = await getAllReadings();
   return all.filter(r => r.timestamp >= sinceTs);
 }
+
+export async function getReadingById(id) {
+  const store = await tx('readonly');
+  return new Promise((resolve, reject) => {
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function updateReading(id, updates) {
+  const existing = await getReadingById(id);
+  if (!existing) throw new Error(`Reading ${id} not found`);
+  const updated = { ...existing, ...updates };
+  const store = await tx('readwrite');
+  return new Promise((resolve, reject) => {
+    const req = store.put(updated);
+    req.onsuccess = () => resolve(updated);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function importReadings(readings) {
+  const existing = await getAllReadings();
+  const existingIds = new Set(existing.map(r => r.id));
+  const store = await tx('readwrite');
+  let imported = 0;
+  let skipped = 0;
+
+  for (const reading of readings) {
+    if (existingIds.has(reading.id)) {
+      skipped++;
+      continue;
+    }
+    try {
+      await new Promise((resolve, reject) => {
+        const req = store.add(reading);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      imported++;
+    } catch (err) {
+      console.error('Import error for', reading.id, err);
+    }
+  }
+
+  return { imported, skipped, total: readings.length };
+}
