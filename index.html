@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Sweet-T</title>
+</head>
+<body>
+  <header class="bar">
+    <h1>Sweet-T</h1>
+    <span id="last-reading" class="muted small"></span>
+  </header>
+
+  <main>
+    <section class="card calc">
+      <label for="glucose">Glucose <span class="muted">(mmol/L)</span></label>
+      <div class="input-row">
+        <input id="glucose" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 7.2" autofocus />
+        <button id="calc" type="button">Calculate</button>
+      </div>
+
+      <div id="result" class="result hidden" aria-live="polite">
+        <div class="result-units"><span id="result-units">0.0</span><span class="muted small">u</span></div>
+        <div id="result-formula" class="muted small"></div>
+        <div class="result-actions">
+          <input id="note" type="text" placeholder="Note (optional)" />
+          <button id="save" type="button" class="primary">Save reading</button>
+          <button id="discard" type="button" class="ghost">Discard</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>Last 7 days</h2>
+        <span id="chart-summary" class="muted small"></span>
+      </div>
+      <div id="chart" class="chart"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>History</h2>
+        <span id="history-count" class="muted small"></span>
+      </div>
+      <ul id="history" class="history"></ul>
+      <p id="history-empty" class="muted small empty">No readings yet.</p>
+    </section>
+  </main>
+
+  <footer class="bar footer">
+    <button id="export" type="button" class="ghost">Export CSV</button>
+    <button id="clear-all" type="button" class="ghost danger">Clear all</button>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

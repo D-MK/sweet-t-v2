@@ -1,0 +1,44 @@
+{
+  "project": "sweet-t-v2",
+  "description": "Glucose log + insulin calculator PWA. Vanilla, IndexedDB, no backend.",
+  "lastUpdated": "2026-05-10",
+  "phases": [
+    {
+      "id": 1,
+      "name": "MVP",
+      "status": "done",
+      "tasks": [
+        { "task": "Vanilla HTML/CSS/JS scaffold, no build step", "status": "done" },
+        { "task": "Piecewise insulin formula (mmol/L input)", "status": "done" },
+        { "task": "IndexedDB readings store with timestamp index", "status": "done" },
+        { "task": "7-day SVG line chart with hi/lo threshold lines", "status": "done" },
+        { "task": "History list with delete-per-row", "status": "done" },
+        { "task": "CSV export of all readings", "status": "done" },
+        { "task": "Service worker + manifest (installable PWA)", "status": "done" },
+        { "task": "Local smoke test via Chrome DevTools — formula and UI verified", "status": "done" }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Deploy",
+      "status": "in_progress",
+      "tasks": [
+        { "task": "Initial commit", "status": "todo" },
+        { "task": "Create GitHub repo D-MK/sweet-t-v2", "status": "todo" },
+        { "task": "Push to main, enable GitHub Pages", "status": "todo" },
+        { "task": "Verify deploy at https://d-mk.github.io/sweet-t-v2/", "status": "todo" }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Polish (later)",
+      "status": "todo",
+      "tasks": [
+        { "task": "Real PWA icons (replace placeholder ST glyph)", "status": "todo" },
+        { "task": "Edit reading (currently delete-only)", "status": "todo" },
+        { "task": "CSV import (round-trip from export)", "status": "todo" },
+        { "task": "Optional cloud sync via VPS or D1 (only if multi-device need arises)", "status": "todo" }
+      ]
+    }
+  ]
+}
