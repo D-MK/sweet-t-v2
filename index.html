@@ -65,6 +65,7 @@
     <button id="export" type="button" class="ghost">Export CSV</button>
     <button id="import" type="button" class="ghost">Import CSV</button>
     <input id="import-input" type="file" accept=".csv" hidden />
+    <button id="settings-open" type="button" class="ghost">Settings</button>
     <button id="clear-all" type="button" class="ghost danger">Clear all</button>
   </footer>
 
@@ -81,6 +82,45 @@
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="settings-overlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="settings-drawer">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button id="settings-close" type="button" class="ghost" aria-label="Close">×</button>
+      </div>
+
+      <section class="settings-section">
+        <h3>Cloud Sync</h3>
+
+        <div class="settings-row">
+          <label for="sync-enabled" class="settings-label">Sync enabled</label>
+          <label class="toggle">
+            <input id="sync-enabled" type="checkbox" />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p id="sync-toggle-error" class="settings-error hidden">URL and token are required to enable sync.</p>
+
+        <div class="settings-field">
+          <label for="sync-url">API base URL</label>
+          <input id="sync-url" type="text" placeholder="https://watch.example.com" autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="settings-field">
+          <label for="sync-token">API token</label>
+          <input id="sync-token" type="password" placeholder="Bearer token" autocomplete="off" />
+        </div>
+
+        <p id="sync-pending" class="muted small settings-pending"></p>
+      </section>
+
+      <div class="settings-actions">
+        <button id="settings-save" type="button" class="primary">Save</button>
+        <button id="settings-cancel" type="button" class="ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>

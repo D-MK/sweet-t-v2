@@ -37,7 +37,7 @@
         { "task": "Real PWA icons (replace placeholder ST glyph)", "status": "todo" },
         { "task": "Edit reading (currently delete-only)", "status": "todo" },
         { "task": "CSV import (round-trip from export)", "status": "todo" },
-        { "task": "Optional cloud sync via VPS or D1 (only if multi-device need arises)", "status": "todo" }
+        { "task": "Optional cloud sync via VPS or D1 (only if multi-device need arises)", "status": "done", "note": "VPS sync via personal-watch backend, fire-and-forget outbox, offline-first preserved" }
       ]
     }
   ]
