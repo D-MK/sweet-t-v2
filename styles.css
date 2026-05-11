@@ -98,6 +98,18 @@ button.danger { color: var(--danger); }
 .result-units span:first-child { font-size: 56px; font-weight: 700; color: var(--accent-hi); line-height: 1; }
 .result-actions { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
 .result-actions input { font-size: 14px; padding: 10px 12px; }
+.result-actions #timestamp-input { margin: 6px 0; }
+
+.checkbox-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--muted); cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px; height: 18px; cursor: pointer;
+  accent-color: var(--accent);
+}
 
 .chart { width: 100%; height: 160px; }
 .chart svg { width: 100%; height: 100%; display: block; }
@@ -118,11 +130,49 @@ button.danger { color: var(--danger); }
 .history li .glucose.lo { color: var(--danger); }
 .history li .insulin { color: var(--accent-hi); font-weight: 600; font-variant-numeric: tabular-nums; }
 .history li .note { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: 2px; }
-.history li button.row-del {
-  grid-column: 3; padding: 4px 8px; font-size: 12px; color: var(--muted);
-  background: transparent; border-color: transparent;
+.history li .row-actions {
+  display: flex; gap: 4px;
 }
+
+.history li button.row-edit, .history li button.row-del {
+  padding: 4px 8px; font-size: 12px; color: var(--muted);
+  background: transparent; border-color: transparent; cursor: pointer;
+}
+.history li button.row-edit:hover { color: var(--accent); }
 .history li button.row-del:hover { color: var(--danger); }
+
+.edit-mode {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 8px 0;
+}
+
+.edit-field {
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.edit-field label {
+  font-size: 12px; color: var(--muted);
+  font-weight: 600;
+}
+
+.edit-field input {
+  padding: 8px; font-size: 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.edit-actions {
+  display: flex; gap: 6px; margin-top: 4px;
+}
+
+.edit-actions button {
+  flex: 1; padding: 8px 12px; font-size: 12px;
+  border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border);
+}
 
 .toast {
   position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%) translateY(20px);
@@ -133,3 +183,62 @@ button.danger { color: var(--danger); }
   z-index: 100;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(11, 18, 32, 0.8); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 1; pointer-events: auto; transition: opacity 0.2s;
+}
+.modal.hidden {
+  opacity: 0; pointer-events: none;
+}
+
+.modal-content {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  max-width: 450px; width: 90%;
+  max-height: 80vh; overflow-y: auto;
+}
+
+.modal-content h2 {
+  margin-top: 0; margin-bottom: 12px; font-size: 18px;
+}
+
+.import-preview {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; margin: 12px 0;
+  max-height: 200px; overflow-y: auto;
+}
+
+.import-preview-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  padding: 8px; border-bottom: 1px solid var(--border);
+}
+.import-preview-row:last-child { border-bottom: none; }
+
+.preview-glucose {
+  font-weight: 600;
+}
+
+.preview-time {
+  font-size: 12px; color: var(--muted);
+}
+
+.preview-insulin {
+  color: var(--accent-hi); font-weight: 600;
+}
+
+.preview-more {
+  padding: 4px 8px; text-align: center;
+}
+
+.modal-actions {
+  display: flex; gap: 8px; margin-top: 16px;
+}
+
+.modal-actions button {
+  flex: 1;
+}
