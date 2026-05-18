@@ -3,6 +3,8 @@
 Lightweight glucose log + insulin calculator. Personal use, single device,
 installable as a PWA, runs entirely in the browser.
 
+![Sweet-T screenshot — 7-day chart and history](docs/screenshot.png)
+
 ## Insulin formula
 
 Input is glucose in mmol/L. The calculator applies a piecewise rule:
