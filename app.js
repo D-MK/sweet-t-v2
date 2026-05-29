@@ -27,8 +27,20 @@ const els = {
   note: $("note"),
   timestampToggle: $("timestamp-toggle"),
   timestampInput: $("timestamp-input"),
+  humalog: $("humalog"),
+  lantus: $("lantus"),
+  noInsulinBtn: $("no-insulin"),
   saveBtn: $("save"),
   discardBtn: $("discard"),
+  insulinOnlyToggle: $("insulin-only-toggle"),
+  insulinOnly: $("insulin-only"),
+  ioHumalog: $("io-humalog"),
+  ioLantus: $("io-lantus"),
+  ioNote: $("io-note"),
+  ioTimestampToggle: $("io-timestamp-toggle"),
+  ioTimestampInput: $("io-timestamp-input"),
+  ioSaveBtn: $("io-save"),
+  ioCancelBtn: $("io-cancel"),
   chart: $("chart"),
   chartSummary: $("chart-summary"),
   history: $("history"),
@@ -62,6 +74,15 @@ function calculateInsulin(mmol) {
   const mgdl = mmol * 18;
   const insulin = mgdl > 100 ? (mgdl - 80) / 40 : mgdl / 40;
   return { mgdl, insulin, branch: mgdl > 100 ? "hi" : "lo" };
+}
+
+function parseDose(value) {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+}
+
+function fmtDose(n) {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 function formatTime(ts) {
@@ -125,6 +146,8 @@ function onCalc() {
   els.timestampToggle.checked = false;
   els.timestampInput.hidden = true;
   els.timestampInput.value = toDatetimeLocal(pending.timestamp);
+  els.humalog.value = fmtDose(pending.insulin);
+  els.lantus.value = "";
   els.note.value = "";
   els.note.focus({ preventScroll: true });
 }
@@ -133,12 +156,68 @@ function discardPending() {
   pending = null;
   els.result.classList.add("hidden");
   els.glucose.value = "";
+  els.humalog.value = "";
+  els.lantus.value = "";
   els.glucose.focus();
+}
+
+function clearDoses() {
+  els.humalog.value = "";
+  els.lantus.value = "";
+  els.humalog.focus({ preventScroll: true });
+}
+
+function toggleInsulinOnly(show) {
+  const open =
+    show != null ? show : els.insulinOnly.classList.contains("hidden");
+  els.insulinOnly.classList.toggle("hidden", !open);
+  if (open) {
+    els.ioHumalog.value = "";
+    els.ioLantus.value = "";
+    els.ioNote.value = "";
+    els.ioTimestampToggle.checked = false;
+    els.ioTimestampInput.hidden = true;
+    els.ioTimestampInput.value = toDatetimeLocal(Date.now());
+    els.ioHumalog.focus({ preventScroll: true });
+  }
+}
+
+async function onInsulinOnlySave() {
+  const humalog = parseDose(els.ioHumalog.value);
+  const lantus = parseDose(els.ioLantus.value);
+  if (humalog == null && lantus == null) {
+    showToast("Enter a Humalog or Lantus dose");
+    return;
+  }
+  const timestamp = els.ioTimestampToggle.checked
+    ? fromDatetimeLocal(els.ioTimestampInput.value)
+    : Date.now();
+  const reading = {
+    id: crypto.randomUUID(),
+    timestamp,
+    glucose_mmol: null,
+    glucose_mgdl: null,
+    insulin: null,
+    humalog_units: humalog,
+    lantus_units: lantus,
+    note: els.ioNote.value.trim(),
+  };
+  try {
+    await addReading(reading);
+    showToast("Insulin logged");
+    toggleInsulinOnly(false);
+    await refresh();
+  } catch (err) {
+    showToast("Save failed");
+    console.error(err);
+  }
 }
 
 async function onSave() {
   if (!pending) return;
   pending.note = els.note.value.trim();
+  pending.humalog_units = parseDose(els.humalog.value);
+  pending.lantus_units = parseDose(els.lantus.value);
   if (els.timestampToggle.checked) {
     pending.timestamp = fromDatetimeLocal(els.timestampInput.value);
   } else {
@@ -147,7 +226,7 @@ async function onSave() {
   try {
     await addReading(pending);
     const settings = getSyncSettings();
-    if (settings.enabled) {
+    if (settings.enabled && pending.glucose_mgdl != null) {
       enqueue(pending);
       drainOutbox();
     }
@@ -186,10 +265,20 @@ async function onEditSave(id) {
   const glucoseInput = li.querySelector('[data-field="glucose"]');
   const timestampInput = li.querySelector('[data-field="timestamp"]');
   const noteInput = li.querySelector('[data-field="note"]');
+  const humalogInput = li.querySelector('[data-field="humalog"]');
+  const lantusInput = li.querySelector('[data-field="lantus"]');
 
-  const glucose = parseFloat(glucoseInput.value);
-  if (!Number.isFinite(glucose) || glucose <= 0) {
+  const glucoseRaw = glucoseInput.value.trim();
+  const hasGlucose = glucoseRaw !== "";
+  const glucose = parseFloat(glucoseRaw);
+  if (hasGlucose && (!Number.isFinite(glucose) || glucose <= 0)) {
     showToast("Invalid glucose value");
+    return;
+  }
+  const humalog = parseDose(humalogInput.value);
+  const lantus = parseDose(lantusInput.value);
+  if (!hasGlucose && humalog == null && lantus == null) {
+    showToast("Need a glucose or insulin value");
     return;
   }
 
@@ -204,15 +293,24 @@ async function onEditSave(id) {
     return;
   }
 
-  const { mgdl, insulin } = calculateInsulin(glucose);
+  const updates = {
+    timestamp,
+    note,
+    humalog_units: humalog,
+    lantus_units: lantus,
+  };
+  if (hasGlucose) {
+    const { mgdl, insulin } = calculateInsulin(glucose);
+    updates.glucose_mmol = glucose;
+    updates.glucose_mgdl = Math.round(mgdl * 10) / 10;
+    updates.insulin = Math.round(insulin * 10) / 10;
+  } else {
+    updates.glucose_mmol = null;
+    updates.glucose_mgdl = null;
+    updates.insulin = null;
+  }
   try {
-    await updateReading(id, {
-      glucose_mmol: glucose,
-      glucose_mgdl: Math.round(mgdl * 10) / 10,
-      insulin: Math.round(insulin * 10) / 10,
-      timestamp,
-      note,
-    });
+    await updateReading(id, updates);
     showToast("Updated");
     editingId = null;
     await refresh();
@@ -236,15 +334,17 @@ async function onExport() {
     return;
   }
   const header =
-    "id,timestamp_iso,timestamp_ms,glucose_mmol,glucose_mgdl,insulin_units,note\n";
+    "id,timestamp_iso,timestamp_ms,glucose_mmol,glucose_mgdl,insulin_units,humalog_units,lantus_units,note\n";
   const rows = all.map((r) =>
     [
       r.id,
       new Date(r.timestamp).toISOString(),
       r.timestamp,
-      r.glucose_mmol,
-      r.glucose_mgdl,
-      r.insulin,
+      r.glucose_mmol ?? "",
+      r.glucose_mgdl ?? "",
+      r.insulin ?? "",
+      r.humalog_units ?? "",
+      r.lantus_units ?? "",
       JSON.stringify(r.note || ""),
     ].join(","),
   );
@@ -279,20 +379,32 @@ function parseCSV(csv) {
       obj[h] = cells[idx] ? cells[idx].trim() : "";
     });
 
+    const glucoseMmol = parseFloat(obj.glucose_mmol);
+    const glucoseMgdl = parseFloat(obj.glucose_mgdl);
+    const insulin = parseFloat(obj.insulin_units);
+    const humalog = parseFloat(obj.humalog_units);
+    const lantus = parseFloat(obj.lantus_units);
+    const hasGlucose = Number.isFinite(glucoseMmol) && glucoseMmol > 0;
     const reading = {
       id: obj.id || crypto.randomUUID(),
-      glucose_mmol: parseFloat(obj.glucose_mmol),
-      glucose_mgdl: parseFloat(obj.glucose_mgdl),
-      insulin: parseFloat(obj.insulin_units),
+      glucose_mmol: hasGlucose ? glucoseMmol : null,
+      glucose_mgdl: Number.isFinite(glucoseMgdl) ? glucoseMgdl : null,
+      insulin: Number.isFinite(insulin) ? insulin : null,
+      humalog_units: Number.isFinite(humalog) && humalog > 0 ? humalog : null,
+      lantus_units: Number.isFinite(lantus) && lantus > 0 ? lantus : null,
       timestamp:
         parseInt(obj.timestamp_ms) || new Date(obj.timestamp_iso).getTime(),
       note: obj.note ? JSON.parse(obj.note) : "",
     };
 
-    if (!Number.isFinite(reading.glucose_mmol) || reading.glucose_mmol <= 0) {
+    if (!Number.isFinite(reading.timestamp)) {
       continue;
     }
-    if (!Number.isFinite(reading.timestamp)) {
+    if (
+      !hasGlucose &&
+      reading.humalog_units == null &&
+      reading.lantus_units == null
+    ) {
       continue;
     }
 
@@ -312,10 +424,21 @@ function showImportModal(readings) {
   preview.forEach((r) => {
     const div = document.createElement("div");
     div.className = "import-preview-row";
+    const glucoseLabel =
+      r.glucose_mmol != null
+        ? `${r.glucose_mmol.toFixed(1)} mmol/L`
+        : "Insulin only";
+    const doseLabel =
+      [
+        r.humalog_units != null ? `${fmtDose(r.humalog_units)}u H` : null,
+        r.lantus_units != null ? `${fmtDose(r.lantus_units)}u L` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || (r.insulin != null ? `${r.insulin.toFixed(1)}u` : "");
     div.innerHTML = `
-      <div class="preview-glucose">${r.glucose_mmol.toFixed(1)} mmol/L</div>
+      <div class="preview-glucose">${glucoseLabel}</div>
       <div class="preview-time">${formatTime(r.timestamp)}</div>
-      <div class="preview-insulin">${r.insulin.toFixed(1)}u</div>
+      <div class="preview-insulin">${doseLabel}</div>
     `;
     els.importPreview.appendChild(div);
   });
@@ -385,11 +508,20 @@ function renderHistory(readings) {
     const isEditing = editingId === r.id;
 
     if (isEditing) {
+      const hasGlucose = r.glucose_mmol != null;
       li.innerHTML = `
         <div class="edit-mode">
           <div class="edit-field">
             <label class="small muted">Glucose (mmol/L)</label>
-            <input type="number" data-field="glucose" value="${r.glucose_mmol}" step="0.1" min="0" />
+            <input type="number" data-field="glucose" value="${hasGlucose ? r.glucose_mmol : ""}" step="0.1" min="0" placeholder="(insulin only)" />
+          </div>
+          <div class="edit-field">
+            <label class="small muted">Humalog (u)</label>
+            <input type="number" data-field="humalog" value="${r.humalog_units ?? ""}" step="0.5" min="0" placeholder="(optional)" />
+          </div>
+          <div class="edit-field">
+            <label class="small muted">Lantus (u)</label>
+            <input type="number" data-field="lantus" value="${r.lantus_units ?? ""}" step="0.5" min="0" placeholder="(optional)" />
           </div>
           <div class="edit-field">
             <label class="small muted">Time</label>
@@ -406,12 +538,27 @@ function renderHistory(readings) {
         </div>
       `;
     } else {
+      const glucoseHtml =
+        r.glucose_mmol != null
+          ? `<div class="glucose ${cls}">${r.glucose_mmol.toFixed(1)} <span class="muted small">mmol/L</span></div>`
+          : `<div class="glucose insulin-only-label">Insulin only</div>`;
+      const doseParts = [];
+      if (r.humalog_units != null)
+        doseParts.push(
+          `<span class="dose humalog">${fmtDose(r.humalog_units)}u H</span>`,
+        );
+      if (r.lantus_units != null)
+        doseParts.push(
+          `<span class="dose lantus">${fmtDose(r.lantus_units)}u L</span>`,
+        );
+      if (doseParts.length === 0 && r.insulin != null)
+        doseParts.push(`<span class="insulin">${r.insulin.toFixed(1)}u</span>`);
       li.innerHTML = `
         <div>
-          <div class="glucose ${cls}">${r.glucose_mmol.toFixed(1)} <span class="muted small">mmol/L</span></div>
+          ${glucoseHtml}
           <div class="when">${formatTime(r.timestamp)}</div>
         </div>
-        <div class="insulin">${r.insulin.toFixed(1)}u</div>
+        <div class="doses">${doseParts.join("")}</div>
         <div class="row-actions">
           <button class="row-edit" data-id="${r.id}" aria-label="Edit">✎</button>
           <button class="row-del" data-id="${r.id}" aria-label="Delete">×</button>
@@ -452,12 +599,23 @@ function renderLastReadingBadge(readings) {
     return;
   }
   const r = readings[0];
-  els.lastReading.textContent = `${r.glucose_mmol.toFixed(1)} · ${formatTime(r.timestamp)}`;
+  const label =
+    r.glucose_mmol != null
+      ? r.glucose_mmol.toFixed(1)
+      : [
+          r.humalog_units != null ? `${fmtDose(r.humalog_units)}u H` : null,
+          r.lantus_units != null ? `${fmtDose(r.lantus_units)}u L` : null,
+        ]
+          .filter(Boolean)
+          .join(" ");
+  els.lastReading.textContent = `${label} · ${formatTime(r.timestamp)}`;
 }
 
 function renderChartSummary(readings) {
   const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recent = readings.filter((r) => r.timestamp >= since);
+  const recent = readings.filter(
+    (r) => r.timestamp >= since && r.glucose_mmol != null,
+  );
   if (recent.length === 0) {
     els.chartSummary.textContent = "";
     return;
@@ -524,6 +682,7 @@ function bind() {
   });
   els.saveBtn.addEventListener("click", onSave);
   els.discardBtn.addEventListener("click", discardPending);
+  els.noInsulinBtn.addEventListener("click", clearDoses);
   els.exportBtn.addEventListener("click", onExport);
   els.importBtn.addEventListener("click", () => els.importInput.click());
   els.importInput.addEventListener("change", onImportFile);
@@ -539,6 +698,12 @@ function bind() {
   els.settingsSaveBtn.addEventListener("click", onSettingsSave);
   els.settingsOverlay.addEventListener("click", (e) => {
     if (e.target === els.settingsOverlay) closeSettings();
+  });
+  els.insulinOnlyToggle.addEventListener("click", () => toggleInsulinOnly());
+  els.ioSaveBtn.addEventListener("click", onInsulinOnlySave);
+  els.ioCancelBtn.addEventListener("click", () => toggleInsulinOnly(false));
+  els.ioTimestampToggle.addEventListener("change", () => {
+    els.ioTimestampInput.hidden = !els.ioTimestampToggle.checked;
   });
 }
 
