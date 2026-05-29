@@ -292,6 +292,7 @@ button.danger { color: var(--danger); }
 .dose-field label { margin: 0; }
 .dose-field input { font-size: 16px; text-align: center; padding: 10px 12px; }
 
+.no-insulin { width: 100%; font-size: 13px; color: var(--muted); padding: 8px; }
 .insulin-only-toggle { margin-top: 14px; width: 100%; color: var(--muted); }
 .insulin-only {
   margin-top: 12px; padding-top: 14px;

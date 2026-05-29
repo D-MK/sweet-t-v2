@@ -29,6 +29,7 @@ const els = {
   timestampInput: $("timestamp-input"),
   humalog: $("humalog"),
   lantus: $("lantus"),
+  noInsulinBtn: $("no-insulin"),
   saveBtn: $("save"),
   discardBtn: $("discard"),
   insulinOnlyToggle: $("insulin-only-toggle"),
@@ -158,6 +159,12 @@ function discardPending() {
   els.humalog.value = "";
   els.lantus.value = "";
   els.glucose.focus();
+}
+
+function clearDoses() {
+  els.humalog.value = "";
+  els.lantus.value = "";
+  els.humalog.focus({ preventScroll: true });
 }
 
 function toggleInsulinOnly(show) {
@@ -675,6 +682,7 @@ function bind() {
   });
   els.saveBtn.addEventListener("click", onSave);
   els.discardBtn.addEventListener("click", discardPending);
+  els.noInsulinBtn.addEventListener("click", clearDoses);
   els.exportBtn.addEventListener("click", onExport);
   els.importBtn.addEventListener("click", () => els.importInput.click());
   els.importInput.addEventListener("change", onImportFile);
