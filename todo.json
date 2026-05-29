@@ -35,9 +35,25 @@
       "status": "todo",
       "tasks": [
         { "task": "Real PWA icons (replace placeholder ST glyph)", "status": "todo" },
-        { "task": "Edit reading (currently delete-only)", "status": "todo" },
-        { "task": "CSV import (round-trip from export)", "status": "todo" },
+        { "task": "Edit reading (currently delete-only)", "status": "done" },
+        { "task": "CSV import (round-trip from export)", "status": "done" },
         { "task": "Optional cloud sync via VPS or D1 (only if multi-device need arises)", "status": "done", "note": "VPS sync via personal-watch backend, fire-and-forget outbox, offline-first preserved" }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Record insulin taken (Humalog + Lantus)",
+      "status": "done",
+      "note": "Distinct from the calculated `insulin` suggestion. Graph = bars-at-bottom track. Insulin-only entries (no glucose) supported for bedtime Lantus.",
+      "tasks": [
+        { "task": "Data model: add optional humalog_units + lantus_units; valid record = glucose>0 OR a dose>0 (no IndexedDB migration needed)", "status": "todo" },
+        { "task": "Result panel: Humalog input prefilled with suggested dose, Lantus input blank", "status": "todo" },
+        { "task": "'+ Log insulin only' collapsible path: doses + time + note, no glucose", "status": "todo" },
+        { "task": "Chart: 28px insulin track below glucose line, color-coded bars per type, legend; glucose line skips null-glucose records", "status": "todo" },
+        { "task": "Edit mode: add humalog/lantus fields", "status": "todo" },
+        { "task": "CSV export/import: add humalog_units,lantus_units columns; keep row if glucose OR dose present", "status": "todo" },
+        { "task": "Sync: insulin-only records (no mg_dl) skip enqueue — glucose-only sync unchanged", "status": "todo" },
+        { "task": "Verify: node --check modules + Chrome DevTools smoke (bars render, insulin-only entry in history) + screenshot", "status": "todo" }
       ]
     }
   ]

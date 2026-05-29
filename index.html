@@ -30,6 +30,16 @@
       <div id="result" class="result hidden" aria-live="polite">
         <div class="result-units"><span id="result-units">0.0</span><span class="muted small">u</span></div>
         <div id="result-formula" class="muted small"></div>
+        <div class="dose-row">
+          <div class="dose-field">
+            <label for="humalog">Humalog taken</label>
+            <input id="humalog" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+          </div>
+          <div class="dose-field">
+            <label for="lantus">Lantus taken</label>
+            <input id="lantus" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+          </div>
+        </div>
         <div class="result-actions">
           <input id="note" type="text" placeholder="Note (optional)" />
           <label class="checkbox-label">
@@ -39,6 +49,30 @@
           <input id="timestamp-input" type="datetime-local" hidden />
           <button id="save" type="button" class="primary">Save reading</button>
           <button id="discard" type="button" class="ghost">Discard</button>
+        </div>
+      </div>
+
+      <button id="insulin-only-toggle" type="button" class="ghost insulin-only-toggle">+ Log insulin only</button>
+      <div id="insulin-only" class="insulin-only hidden">
+        <div class="dose-row">
+          <div class="dose-field">
+            <label for="io-humalog">Humalog</label>
+            <input id="io-humalog" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+          </div>
+          <div class="dose-field">
+            <label for="io-lantus">Lantus</label>
+            <input id="io-lantus" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+          </div>
+        </div>
+        <input id="io-note" type="text" placeholder="Note (optional)" />
+        <label class="checkbox-label">
+          <input id="io-timestamp-toggle" type="checkbox" />
+          <span>Custom time</span>
+        </label>
+        <input id="io-timestamp-input" type="datetime-local" hidden />
+        <div class="io-actions">
+          <button id="io-save" type="button" class="primary">Save insulin</button>
+          <button id="io-cancel" type="button" class="ghost">Cancel</button>
         </div>
       </div>
     </section>
