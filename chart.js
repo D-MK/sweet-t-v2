@@ -48,7 +48,7 @@ export function renderChart(container, readings, { days = 7 } = {}) {
           fill: "var(--muted)",
           "font-size": 13,
         },
-        "No readings in the last 7 days",
+        "No readings in the selected range",
       ),
     );
     return;
@@ -234,8 +234,10 @@ export function renderChart(container, readings, { days = 7 } = {}) {
     });
   }
 
-  // x-axis day labels (every other day)
-  for (let i = 0; i <= days; i += 2) {
+  // x-axis day labels — adaptive density so long windows don't crowd
+  const targetLabels = days <= 14 ? Math.ceil(days / 2) : 6;
+  const labelStep = Math.max(1, Math.ceil(days / targetLabels));
+  for (let i = 0; i <= days; i += labelStep) {
     const t = start + (i / days) * (now - start);
     const date = new Date(t);
     const label = `${date.getMonth() + 1}/${date.getDate()}`;
