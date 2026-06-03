@@ -19,7 +19,13 @@
     <span id="last-reading" class="muted small"></span>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button id="tab-log" type="button" class="tab is-active" role="tab" aria-selected="true" aria-controls="log-view" data-tab="log">Log</button>
+    <button id="tab-metrics" type="button" class="tab" role="tab" aria-selected="false" aria-controls="metrics-view" data-tab="metrics">Metrics</button>
+  </nav>
+
   <main>
+    <div id="log-view" class="tab-panel" role="tabpanel" aria-labelledby="tab-log">
     <section class="card calc">
       <label for="glucose">Glucose <span class="muted">(mmol/L)</span></label>
       <div class="input-row">
@@ -34,11 +40,15 @@
         <div class="dose-row">
           <div class="dose-field">
             <label for="humalog">Humalog taken</label>
-            <input id="humalog" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+            <input id="humalog" type="text" inputmode="none" readonly step="1" min="0" placeholder="u" />
           </div>
           <div class="dose-field">
             <label for="lantus">Lantus taken</label>
-            <input id="lantus" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+            <input id="lantus" type="text" inputmode="none" readonly step="1" min="0" placeholder="u" />
+          </div>
+          <div class="dose-field">
+            <label for="carbs">Carbs (g)</label>
+            <input id="carbs" name="carbs_g" type="text" inputmode="none" readonly step="1" min="0" placeholder="(optional)" />
           </div>
         </div>
         <button id="no-insulin" type="button" class="ghost no-insulin">No insulin taken</button>
@@ -59,11 +69,15 @@
         <div class="dose-row">
           <div class="dose-field">
             <label for="io-humalog">Humalog</label>
-            <input id="io-humalog" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+            <input id="io-humalog" type="text" inputmode="none" readonly step="1" min="0" placeholder="u" />
           </div>
           <div class="dose-field">
             <label for="io-lantus">Lantus</label>
-            <input id="io-lantus" type="number" inputmode="decimal" step="0.5" min="0" placeholder="u" />
+            <input id="io-lantus" type="text" inputmode="none" readonly step="1" min="0" placeholder="u" />
+          </div>
+          <div class="dose-field">
+            <label for="io-carbs">Carbs (g)</label>
+            <input id="io-carbs" name="carbs_g" type="text" inputmode="none" readonly step="1" min="0" placeholder="(optional)" />
           </div>
         </div>
         <input id="io-note" type="text" placeholder="Note (optional)" />
@@ -81,8 +95,17 @@
 
     <section class="card">
       <div class="row between">
-        <h2>Last 7 days</h2>
-        <span id="chart-summary" class="muted small"></span>
+        <h2>Glucose trend</h2>
+        <div class="row">
+          <span id="chart-summary" class="muted small"></span>
+          <select id="chart-range" class="chart-range" aria-label="Chart range">
+            <option value="week" selected>Week</option>
+            <option value="month">Month</option>
+            <option value="quarter">Quarter</option>
+            <option value="year">Year</option>
+            <option value="all">All</option>
+          </select>
+        </div>
       </div>
       <div id="chart" class="chart"></div>
     </section>
@@ -95,6 +118,11 @@
       <ul id="history" class="history"></ul>
       <p id="history-empty" class="muted small empty">No readings yet.</p>
     </section>
+    </div>
+
+    <div id="metrics-view" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-metrics" aria-label="Metrics">
+      <p id="metrics-empty" class="muted small empty hidden">No readings yet.</p>
+    </div>
   </main>
 
   <footer class="bar footer">
