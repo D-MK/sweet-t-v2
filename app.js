@@ -15,6 +15,45 @@ import {
   drainOutbox,
   getOutboxCount,
 } from "./sync.js";
+import { openWheelPicker } from "./picker.js";
+import { renderMetrics } from "./metrics.js";
+
+const DOSE_RANGES = {
+  humalog: { min: 0, max: 40, label: "Humalog (u)" },
+  lantus: { min: 0, max: 60, label: "Lantus (u)" },
+  carbs: { min: 0, max: 200, label: "Carbs (g)" },
+};
+
+function bindWheelInput(input, kind) {
+  if (!input || input.dataset.wheelBound === "1") return;
+  const { min, max, label } = DOSE_RANGES[kind];
+  input.dataset.wheelBound = "1";
+  input.classList.add("wheel-bound");
+  input.setAttribute("readonly", "");
+  input.setAttribute("inputmode", "none");
+
+  const open = (e) => {
+    if (e) e.preventDefault();
+    const parsed = parseInt(input.value, 10);
+    const current = Number.isFinite(parsed) ? parsed : null;
+    input.blur();
+    openWheelPicker({
+      min,
+      max,
+      value: current,
+      label,
+      onPick: (picked) => {
+        input.value = picked == null ? "" : String(picked);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      },
+    });
+  };
+  input.addEventListener("click", open);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") open(e);
+  });
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,6 +69,7 @@ const els = {
   timestampInput: $("timestamp-input"),
   humalog: $("humalog"),
   lantus: $("lantus"),
+  carbs: $("carbs"),
   noInsulinBtn: $("no-insulin"),
   saveBtn: $("save"),
   discardBtn: $("discard"),
@@ -37,6 +77,7 @@ const els = {
   insulinOnly: $("insulin-only"),
   ioHumalog: $("io-humalog"),
   ioLantus: $("io-lantus"),
+  ioCarbs: $("io-carbs"),
   ioNote: $("io-note"),
   ioTimestampToggle: $("io-timestamp-toggle"),
   ioTimestampInput: $("io-timestamp-input"),
@@ -44,6 +85,7 @@ const els = {
   ioCancelBtn: $("io-cancel"),
   chart: $("chart"),
   chartSummary: $("chart-summary"),
+  chartRange: $("chart-range"),
   history: $("history"),
   historyCount: $("history-count"),
   historyEmpty: $("history-empty"),
@@ -67,9 +109,29 @@ const els = {
   syncToken: $("sync-token"),
   syncToggleError: $("sync-toggle-error"),
   syncPending: $("sync-pending"),
+  tabLog: $("tab-log"),
+  tabMetrics: $("tab-metrics"),
+  logView: $("log-view"),
+  metricsView: $("metrics-view"),
 };
 
 let pending = null;
+let activeTab = "log";
+let chartRange = "week";
+
+const RANGE_DAYS = { week: 7, month: 30, quarter: 90, year: 365 };
+
+function daysForRange(range, readings) {
+  if (range === "all") {
+    if (readings.length === 0) return 1;
+    const firstTs = readings.reduce(
+      (m, r) => Math.min(m, r.timestamp),
+      Date.now(),
+    );
+    return Math.max(1, Math.ceil((Date.now() - firstTs) / 86400000));
+  }
+  return RANGE_DAYS[range] ?? 7;
+}
 
 // Below this glucose level, treat the low with fast carbs — never insulin.
 const LOW_GLUCOSE_MMOL = 4;
@@ -82,13 +144,14 @@ function calculateInsulin(mmol) {
     return { mgdl, insulin: 0, recommend: false };
   }
   // Above the ceiling mg/dL always exceeds 100, so the (x − 80) regime applies.
-  const insulin = (mgdl - 80) / 40;
+  // Round up so the recommendation is always a whole number of units.
+  const insulin = Math.ceil((mgdl - 80) / 40);
   return { mgdl, insulin, recommend: true };
 }
 
 function parseDose(value) {
   const n = parseFloat(value);
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
 function fmtDose(n) {
@@ -143,7 +206,7 @@ function onCalc() {
     id: crypto.randomUUID(),
     glucose_mmol: v,
     glucose_mgdl: Math.round(mgdl * 10) / 10,
-    insulin: Math.round(insulin * 10) / 10,
+    insulin,
     timestamp: Date.now(),
     note: "",
   };
@@ -163,6 +226,7 @@ function onCalc() {
   // Only pre-fill the dose when a correction is actually recommended.
   els.humalog.value = recommend ? fmtDose(pending.insulin) : "";
   els.lantus.value = "";
+  els.carbs.value = "";
   els.note.value = "";
   els.note.focus({ preventScroll: true });
 }
@@ -173,6 +237,7 @@ function discardPending() {
   els.glucose.value = "";
   els.humalog.value = "";
   els.lantus.value = "";
+  els.carbs.value = "";
   els.glucose.focus();
 }
 
@@ -189,6 +254,7 @@ function toggleInsulinOnly(show) {
   if (open) {
     els.ioHumalog.value = "";
     els.ioLantus.value = "";
+    els.ioCarbs.value = "";
     els.ioNote.value = "";
     els.ioTimestampToggle.checked = false;
     els.ioTimestampInput.hidden = true;
@@ -200,8 +266,9 @@ function toggleInsulinOnly(show) {
 async function onInsulinOnlySave() {
   const humalog = parseDose(els.ioHumalog.value);
   const lantus = parseDose(els.ioLantus.value);
-  if (humalog == null && lantus == null) {
-    showToast("Enter a Humalog or Lantus dose");
+  const carbs = parseDose(els.ioCarbs.value);
+  if (humalog == null && lantus == null && carbs == null) {
+    showToast("Enter a Humalog, Lantus, or carbs value");
     return;
   }
   const timestamp = els.ioTimestampToggle.checked
@@ -215,6 +282,7 @@ async function onInsulinOnlySave() {
     insulin: null,
     humalog_units: humalog,
     lantus_units: lantus,
+    carbs_g: carbs,
     note: els.ioNote.value.trim(),
   };
   try {
@@ -233,6 +301,7 @@ async function onSave() {
   pending.note = els.note.value.trim();
   pending.humalog_units = parseDose(els.humalog.value);
   pending.lantus_units = parseDose(els.lantus.value);
+  pending.carbs_g = parseDose(els.carbs.value);
   if (els.timestampToggle.checked) {
     pending.timestamp = fromDatetimeLocal(els.timestampInput.value);
   } else {
@@ -282,6 +351,7 @@ async function onEditSave(id) {
   const noteInput = li.querySelector('[data-field="note"]');
   const humalogInput = li.querySelector('[data-field="humalog"]');
   const lantusInput = li.querySelector('[data-field="lantus"]');
+  const carbsInput = li.querySelector('[data-field="carbs"]');
 
   const glucoseRaw = glucoseInput.value.trim();
   const hasGlucose = glucoseRaw !== "";
@@ -292,8 +362,9 @@ async function onEditSave(id) {
   }
   const humalog = parseDose(humalogInput.value);
   const lantus = parseDose(lantusInput.value);
-  if (!hasGlucose && humalog == null && lantus == null) {
-    showToast("Need a glucose or insulin value");
+  const carbs = parseDose(carbsInput.value);
+  if (!hasGlucose && humalog == null && lantus == null && carbs == null) {
+    showToast("Need a glucose, insulin, or carbs value");
     return;
   }
 
@@ -313,12 +384,13 @@ async function onEditSave(id) {
     note,
     humalog_units: humalog,
     lantus_units: lantus,
+    carbs_g: carbs,
   };
   if (hasGlucose) {
     const { mgdl, insulin } = calculateInsulin(glucose);
     updates.glucose_mmol = glucose;
     updates.glucose_mgdl = Math.round(mgdl * 10) / 10;
-    updates.insulin = Math.round(insulin * 10) / 10;
+    updates.insulin = insulin;
   } else {
     updates.glucose_mmol = null;
     updates.glucose_mgdl = null;
@@ -349,7 +421,7 @@ async function onExport() {
     return;
   }
   const header =
-    "id,timestamp_iso,timestamp_ms,glucose_mmol,glucose_mgdl,insulin_units,humalog_units,lantus_units,note\n";
+    "id,timestamp_iso,timestamp_ms,glucose_mmol,glucose_mgdl,insulin_units,humalog_units,lantus_units,carbs_g,note\n";
   const rows = all.map((r) =>
     [
       r.id,
@@ -360,6 +432,7 @@ async function onExport() {
       r.insulin ?? "",
       r.humalog_units ?? "",
       r.lantus_units ?? "",
+      r.carbs_g ?? "",
       JSON.stringify(r.note || ""),
     ].join(","),
   );
@@ -399,6 +472,7 @@ function parseCSV(csv) {
     const insulin = parseFloat(obj.insulin_units);
     const humalog = parseFloat(obj.humalog_units);
     const lantus = parseFloat(obj.lantus_units);
+    const carbs = parseFloat(obj.carbs_g);
     const hasGlucose = Number.isFinite(glucoseMmol) && glucoseMmol > 0;
     const reading = {
       id: obj.id || crypto.randomUUID(),
@@ -407,6 +481,7 @@ function parseCSV(csv) {
       insulin: Number.isFinite(insulin) ? insulin : null,
       humalog_units: Number.isFinite(humalog) && humalog > 0 ? humalog : null,
       lantus_units: Number.isFinite(lantus) && lantus > 0 ? lantus : null,
+      carbs_g: Number.isFinite(carbs) && carbs > 0 ? carbs : null,
       timestamp:
         parseInt(obj.timestamp_ms) || new Date(obj.timestamp_iso).getTime(),
       note: obj.note ? JSON.parse(obj.note) : "",
@@ -418,7 +493,8 @@ function parseCSV(csv) {
     if (
       !hasGlucose &&
       reading.humalog_units == null &&
-      reading.lantus_units == null
+      reading.lantus_units == null &&
+      reading.carbs_g == null
     ) {
       continue;
     }
@@ -532,11 +608,15 @@ function renderHistory(readings) {
           </div>
           <div class="edit-field">
             <label class="small muted">Humalog (u)</label>
-            <input type="number" data-field="humalog" value="${r.humalog_units ?? ""}" step="0.5" min="0" placeholder="(optional)" />
+            <input type="text" inputmode="none" readonly data-field="humalog" value="${r.humalog_units ?? ""}" placeholder="(optional)" />
           </div>
           <div class="edit-field">
             <label class="small muted">Lantus (u)</label>
-            <input type="number" data-field="lantus" value="${r.lantus_units ?? ""}" step="0.5" min="0" placeholder="(optional)" />
+            <input type="text" inputmode="none" readonly data-field="lantus" value="${r.lantus_units ?? ""}" placeholder="(optional)" />
+          </div>
+          <div class="edit-field">
+            <label class="small muted">Carbs (g)</label>
+            <input type="text" inputmode="none" readonly data-field="carbs" value="${r.carbs_g ?? ""}" placeholder="(optional)" />
           </div>
           <div class="edit-field">
             <label class="small muted">Time</label>
@@ -566,6 +646,8 @@ function renderHistory(readings) {
         doseParts.push(
           `<span class="dose lantus">${fmtDose(r.lantus_units)}u L</span>`,
         );
+      if (r.carbs_g != null)
+        doseParts.push(`<span class="dose carbs">${r.carbs_g}g C</span>`);
       if (doseParts.length === 0 && r.insulin != null)
         doseParts.push(`<span class="insulin">${r.insulin.toFixed(1)}u</span>`);
       li.innerHTML = `
@@ -596,6 +678,15 @@ function renderHistory(readings) {
   els.history.querySelectorAll("button.edit-cancel").forEach((btn) => {
     btn.addEventListener("click", onEditCancel);
   });
+  els.history
+    .querySelectorAll('input[data-field="humalog"]')
+    .forEach((input) => bindWheelInput(input, "humalog"));
+  els.history
+    .querySelectorAll('input[data-field="lantus"]')
+    .forEach((input) => bindWheelInput(input, "lantus"));
+  els.history
+    .querySelectorAll('input[data-field="carbs"]')
+    .forEach((input) => bindWheelInput(input, "carbs"));
 }
 
 function escapeHtml(s) {
@@ -626,8 +717,8 @@ function renderLastReadingBadge(readings) {
   els.lastReading.textContent = `${label} · ${formatTime(r.timestamp)}`;
 }
 
-function renderChartSummary(readings) {
-  const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+function renderChartSummary(readings, days) {
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
   const recent = readings.filter(
     (r) => r.timestamp >= since && r.glucose_mmol != null,
   );
@@ -643,8 +734,27 @@ async function refresh() {
   const readings = await getAllReadings();
   renderHistory(readings);
   renderLastReadingBadge(readings);
-  renderChart(els.chart, readings);
-  renderChartSummary(readings);
+  const days = daysForRange(chartRange, readings);
+  renderChart(els.chart, readings, { days });
+  renderChartSummary(readings, days);
+  if (activeTab === "metrics") {
+    await renderMetrics(els.metricsView);
+  }
+}
+
+async function showTab(name) {
+  if (name !== "log" && name !== "metrics") return;
+  activeTab = name;
+  const isLog = name === "log";
+  els.logView.classList.toggle("hidden", !isLog);
+  els.metricsView.classList.toggle("hidden", isLog);
+  els.tabLog.classList.toggle("is-active", isLog);
+  els.tabMetrics.classList.toggle("is-active", !isLog);
+  els.tabLog.setAttribute("aria-selected", isLog ? "true" : "false");
+  els.tabMetrics.setAttribute("aria-selected", isLog ? "false" : "true");
+  if (!isLog) {
+    await renderMetrics(els.metricsView);
+  }
 }
 
 function openSettings() {
@@ -719,6 +829,18 @@ function bind() {
   els.ioCancelBtn.addEventListener("click", () => toggleInsulinOnly(false));
   els.ioTimestampToggle.addEventListener("change", () => {
     els.ioTimestampInput.hidden = !els.ioTimestampToggle.checked;
+  });
+  bindWheelInput(els.humalog, "humalog");
+  bindWheelInput(els.lantus, "lantus");
+  bindWheelInput(els.carbs, "carbs");
+  bindWheelInput(els.ioHumalog, "humalog");
+  bindWheelInput(els.ioLantus, "lantus");
+  bindWheelInput(els.ioCarbs, "carbs");
+  els.tabLog.addEventListener("click", () => showTab("log"));
+  els.tabMetrics.addEventListener("click", () => showTab("metrics"));
+  els.chartRange.addEventListener("change", () => {
+    chartRange = els.chartRange.value;
+    refresh();
   });
 }
 
