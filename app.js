@@ -24,6 +24,7 @@ const els = {
   result: $("result"),
   resultUnits: $("result-units"),
   resultFormula: $("result-formula"),
+  carbAdvice: $("carb-advice"),
   note: $("note"),
   timestampToggle: $("timestamp-toggle"),
   timestampInput: $("timestamp-input"),
@@ -70,10 +71,19 @@ const els = {
 
 let pending = null;
 
+// Below this glucose level, treat the low with fast carbs — never insulin.
+const LOW_GLUCOSE_MMOL = 4;
+// At or below this level, no correction dose is recommended (won't be injecting).
+const NO_INSULIN_MMOL = 6.5;
+
 function calculateInsulin(mmol) {
   const mgdl = mmol * 18;
-  const insulin = mgdl > 100 ? (mgdl - 80) / 40 : mgdl / 40;
-  return { mgdl, insulin, branch: mgdl > 100 ? "hi" : "lo" };
+  if (mmol <= NO_INSULIN_MMOL) {
+    return { mgdl, insulin: 0, recommend: false };
+  }
+  // Above the ceiling mg/dL always exceeds 100, so the (x − 80) regime applies.
+  const insulin = (mgdl - 80) / 40;
+  return { mgdl, insulin, recommend: true };
 }
 
 function parseDose(value) {
@@ -128,7 +138,7 @@ function onCalc() {
     showToast("Enter a glucose value");
     return;
   }
-  const { mgdl, insulin, branch } = calculateInsulin(v);
+  const { mgdl, insulin, recommend } = calculateInsulin(v);
   pending = {
     id: crypto.randomUUID(),
     glucose_mmol: v,
@@ -137,16 +147,21 @@ function onCalc() {
     timestamp: Date.now(),
     note: "",
   };
+  const isLow = v < LOW_GLUCOSE_MMOL;
   els.resultUnits.textContent = pending.insulin.toFixed(1);
-  els.resultFormula.textContent =
-    branch === "hi"
-      ? `${v} × 18 = ${mgdl.toFixed(0)} mg/dL → (${mgdl.toFixed(0)} − 80) ÷ 40`
-      : `${v} × 18 = ${mgdl.toFixed(0)} mg/dL → ${mgdl.toFixed(0)} ÷ 40`;
+  els.resultFormula.textContent = recommend
+    ? `${v} × 18 = ${mgdl.toFixed(0)} mg/dL → (${mgdl.toFixed(0)} − 80) ÷ 40`
+    : `${v} mmol/L is at or below ${NO_INSULIN_MMOL} — no correction dose.`;
+  els.carbAdvice.textContent = isLow
+    ? "⚠ Below 4 mmol/L — eat 1 bread unit (10 g carbohydrate) now."
+    : "";
+  els.carbAdvice.classList.toggle("hidden", !isLow);
   els.result.classList.remove("hidden");
   els.timestampToggle.checked = false;
   els.timestampInput.hidden = true;
   els.timestampInput.value = toDatetimeLocal(pending.timestamp);
-  els.humalog.value = fmtDose(pending.insulin);
+  // Only pre-fill the dose when a correction is actually recommended.
+  els.humalog.value = recommend ? fmtDose(pending.insulin) : "";
   els.lantus.value = "";
   els.note.value = "";
   els.note.focus({ preventScroll: true });

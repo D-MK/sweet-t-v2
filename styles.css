@@ -100,6 +100,15 @@ button.danger { color: var(--danger); }
 .result { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
 .result-units { display: flex; align-items: baseline; gap: 6px; }
 .result-units span:first-child { font-size: 56px; font-weight: 700; color: var(--accent-hi); line-height: 1; }
+.carb-advice {
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 14px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 .result-actions { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
 .result-actions input { font-size: 14px; padding: 10px 12px; }
 .result-actions #timestamp-input { margin: 6px 0; }

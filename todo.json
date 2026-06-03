@@ -1,7 +1,7 @@
 {
   "project": "sweet-t-v2",
   "description": "Glucose log + insulin calculator PWA. Vanilla, IndexedDB, no backend.",
-  "lastUpdated": "2026-05-10",
+  "lastUpdated": "2026-06-03",
   "phases": [
     {
       "id": 1,
@@ -46,14 +46,34 @@
       "status": "done",
       "note": "Distinct from the calculated `insulin` suggestion. Graph = bars-at-bottom track. Insulin-only entries (no glucose) supported for bedtime Lantus.",
       "tasks": [
-        { "task": "Data model: add optional humalog_units + lantus_units; valid record = glucose>0 OR a dose>0 (no IndexedDB migration needed)", "status": "todo" },
-        { "task": "Result panel: Humalog input prefilled with suggested dose, Lantus input blank", "status": "todo" },
-        { "task": "'+ Log insulin only' collapsible path: doses + time + note, no glucose", "status": "todo" },
-        { "task": "Chart: 28px insulin track below glucose line, color-coded bars per type, legend; glucose line skips null-glucose records", "status": "todo" },
-        { "task": "Edit mode: add humalog/lantus fields", "status": "todo" },
-        { "task": "CSV export/import: add humalog_units,lantus_units columns; keep row if glucose OR dose present", "status": "todo" },
-        { "task": "Sync: insulin-only records (no mg_dl) skip enqueue — glucose-only sync unchanged", "status": "todo" },
-        { "task": "Verify: node --check modules + Chrome DevTools smoke (bars render, insulin-only entry in history) + screenshot", "status": "todo" }
+        { "task": "Data model: add optional humalog_units + lantus_units; valid record = glucose>0 OR a dose>0 (no IndexedDB migration needed)", "status": "done" },
+        { "task": "Result panel: Humalog input prefilled with suggested dose, Lantus input blank", "status": "done" },
+        { "task": "'+ Log insulin only' collapsible path: doses + time + note, no glucose", "status": "done" },
+        { "task": "Chart: 28px insulin track below glucose line, color-coded bars per type, legend; glucose line skips null-glucose records", "status": "done" },
+        { "task": "Edit mode: add humalog/lantus fields", "status": "done" },
+        { "task": "CSV export/import: add humalog_units,lantus_units columns; keep row if glucose OR dose present", "status": "done" },
+        { "task": "Sync: insulin-only records (no mg_dl) skip enqueue — glucose-only sync unchanged", "status": "done" },
+        { "task": "Verify: node --check modules + Chrome DevTools smoke (bars render, insulin-only entry in history) + screenshot", "status": "done" }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Polish (continued)",
+      "status": "todo",
+      "tasks": [
+        { "task": "Service worker: make navigation requests network-first (fall back to cache when offline) so deployed HTML/JS updates show on the first launch instead of lagging a launch behind; keep offline support", "status": "todo", "note": "Root cause of installed-PWA showing stale version after a deploy. Current SW is cache-first (return cached || network); the v1->v2 cache bump only self-heals after the new SW activates." },
+        { "task": "Real PWA icons (replace placeholder ST glyph) — carried from Phase 3", "status": "todo" }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Food-target dosing rules",
+      "status": "done",
+      "note": "Safety-driven: no correction insulin at or below target, treat hypos with carbs not insulin.",
+      "tasks": [
+        { "task": "Glucose <= 6.5 mmol/L: recommend 0u and do NOT auto-fill the Humalog field (won't be injecting)", "status": "done" },
+        { "task": "Glucose < 4 mmol/L: show red 'eat 1 bread unit (10 g carbohydrate)' recommendation", "status": "done" },
+        { "task": "Verify: Chrome DevTools smoke at 3.5 / 6.5 / 9.0 mmol + screenshots", "status": "done" }
       ]
     }
   ]
