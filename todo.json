@@ -75,6 +75,26 @@
         { "task": "Glucose < 4 mmol/L: show red 'eat 1 bread unit (10 g carbohydrate)' recommendation", "status": "done" },
         { "task": "Verify: Chrome DevTools smoke at 3.5 / 6.5 / 9.0 mmol + screenshots", "status": "done" }
       ]
+    },
+    {
+      "id": 7,
+      "name": "UX + insights batch (11 changes)",
+      "status": "in_progress",
+      "note": "Branch feat/sweet-t-improvements. Built via 2 parallel agents (metrics.js, chart.js) + orchestrator shell. Shared config.js holds TARGET=6 band 5-7.",
+      "tasks": [
+        { "task": "#1 Carbs wheel steps in 5s (DOSE_RANGES.carbs step:5, snap legacy off-grid values)", "status": "done" },
+        { "task": "#2 History loads current week by default + 'Show older' toggle", "status": "done" },
+        { "task": "#3 Export/Import/Settings/Clear relocated to a toolbar above History", "status": "done" },
+        { "task": "#4 Target band 6 (+/-1) shaded + dashed target line on chart", "status": "done" },
+        { "task": "#5 Google Drive daily backup (appDataFolder, GIS token client, graceful)", "status": "done", "note": "MANUAL: create public OAuth Client ID authorizing https://d-mk.github.io; OAuth round-trip not testable headless" },
+        { "task": "#6 Metrics hour-of-day glucose heatmap (7/14/30d rows x 3h bands)", "status": "done" },
+        { "task": "#7 Avg-daily dose over days actually logged, not window length", "status": "done" },
+        { "task": "#8 Metrics windows collapsible — 7d open, 14/30d collapsed", "status": "done" },
+        { "task": "#9 Weekly LLM review — options memo + copy-prompt enabler", "status": "done", "note": "docs/llm-weekly-review.md; full run recommended server-side via /schedule" },
+        { "task": "#10 Chart series toggle: Both / Glucose / Insulin, insulin on right y-axis", "status": "done" },
+        { "task": "#11 Light mode + themes (dark/light/ocean/sunset/midnight) via [data-theme]", "status": "done" },
+        { "task": "Critic review pass + node --check all modules + open PR", "status": "in_progress" }
+      ]
     }
   ]
 }

@@ -12,6 +12,15 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="styles.css" />
   <title>Sweet-T</title>
+  <script>
+    // No-FOUC theme bootstrap — apply the saved theme before first paint.
+    try {
+      var t = localStorage.getItem("sweet_t_theme");
+      if (["dark", "light", "ocean", "sunset", "midnight"].indexOf(t) >= 0) {
+        document.documentElement.setAttribute("data-theme", t);
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <header class="bar">
@@ -107,7 +116,23 @@
           </select>
         </div>
       </div>
+      <div class="chart-mode-row">
+        <div class="chart-mode" role="group" aria-label="Chart series">
+          <button type="button" data-mode="both" class="is-active">Both</button>
+          <button type="button" data-mode="glucose">Glucose</button>
+          <button type="button" data-mode="insulin">Insulin</button>
+        </div>
+      </div>
       <div id="chart" class="chart"></div>
+    </section>
+
+    <section class="card actions-card">
+      <button id="export" type="button" class="ghost">Export CSV</button>
+      <button id="import" type="button" class="ghost">Import CSV</button>
+      <input id="import-input" type="file" accept=".csv" hidden />
+      <button id="weekly-review" type="button" class="ghost">Weekly review</button>
+      <button id="settings-open" type="button" class="ghost">Settings</button>
+      <button id="clear-all" type="button" class="ghost danger">Clear all</button>
     </section>
 
     <section class="card">
@@ -116,6 +141,7 @@
         <span id="history-count" class="muted small"></span>
       </div>
       <ul id="history" class="history"></ul>
+      <button id="history-more" type="button" class="ghost history-more hidden"></button>
       <p id="history-empty" class="muted small empty">No readings yet.</p>
     </section>
     </div>
@@ -124,14 +150,6 @@
       <p id="metrics-empty" class="muted small empty hidden">No readings yet.</p>
     </div>
   </main>
-
-  <footer class="bar footer">
-    <button id="export" type="button" class="ghost">Export CSV</button>
-    <button id="import" type="button" class="ghost">Import CSV</button>
-    <input id="import-input" type="file" accept=".csv" hidden />
-    <button id="settings-open" type="button" class="ghost">Settings</button>
-    <button id="clear-all" type="button" class="ghost danger">Clear all</button>
-  </footer>
 
   <div id="import-modal" class="modal hidden">
     <div class="modal-content">
@@ -179,6 +197,32 @@
         <p id="sync-pending" class="muted small settings-pending"></p>
       </section>
 
+      <section class="settings-section">
+        <h3>Appearance</h3>
+        <div class="settings-field">
+          <label for="theme-select">Theme</label>
+          <select id="theme-select" class="settings-select" aria-label="Theme"></select>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Google Drive Backup</h3>
+        <div class="settings-row">
+          <span class="settings-label">Status</span>
+          <span id="gdrive-status" class="muted small">Not connected</span>
+        </div>
+        <div class="settings-field">
+          <label for="gdrive-client-id">OAuth Client ID</label>
+          <input id="gdrive-client-id" type="text" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="settings-inline-actions">
+          <button id="gdrive-connect" type="button" class="primary">Connect</button>
+          <button id="gdrive-backup" type="button" class="ghost">Back up now</button>
+          <button id="gdrive-restore" type="button" class="ghost">Restore</button>
+        </div>
+        <p id="gdrive-info" class="muted small settings-status"></p>
+      </section>
+
       <div class="settings-actions">
         <button id="settings-save" type="button" class="primary">Save</button>
         <button id="settings-cancel" type="button" class="ghost">Cancel</button>
@@ -186,6 +230,7 @@
     </div>
   </div>
 
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
