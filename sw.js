@@ -1,4 +1,4 @@
-const CACHE = "sweet-t-v2";
+const CACHE = "sweet-t-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,7 +6,13 @@ const ASSETS = [
   "./app.js",
   "./db.js",
   "./chart.js",
+  "./metrics.js",
+  "./picker.js",
   "./sync.js",
+  "./config.js",
+  "./theme.js",
+  "./gdrive.js",
+  "./weekly.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

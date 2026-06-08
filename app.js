@@ -17,16 +17,30 @@ import {
 } from "./sync.js";
 import { openWheelPicker } from "./picker.js";
 import { renderMetrics } from "./metrics.js";
+import { initTheme, getTheme, saveTheme, THEMES } from "./theme.js";
+import {
+  getGdriveConfig,
+  saveGdriveConfig,
+  connect as gdriveConnect,
+  disconnect as gdriveDisconnect,
+  backupNow,
+  restoreFromDrive,
+  maybeDailySync,
+  isConnected as gdriveConnected,
+  getLastSync,
+} from "./gdrive.js";
+import { copyWeeklyReview } from "./weekly.js";
 
 const DOSE_RANGES = {
   humalog: { min: 0, max: 40, label: "Humalog (u)" },
   lantus: { min: 0, max: 60, label: "Lantus (u)" },
-  carbs: { min: 0, max: 200, label: "Carbs (g)" },
+  // Carbs step in 5s (#1) — the wheel only offers 0, 5, 10 … 200.
+  carbs: { min: 0, max: 200, step: 5, label: "Carbs (g)" },
 };
 
 function bindWheelInput(input, kind) {
   if (!input || input.dataset.wheelBound === "1") return;
-  const { min, max, label } = DOSE_RANGES[kind];
+  const { min, max, step = 1, label } = DOSE_RANGES[kind];
   input.dataset.wheelBound = "1";
   input.classList.add("wheel-bound");
   input.setAttribute("readonly", "");
@@ -35,11 +49,16 @@ function bindWheelInput(input, kind) {
   const open = (e) => {
     if (e) e.preventDefault();
     const parsed = parseInt(input.value, 10);
-    const current = Number.isFinite(parsed) ? parsed : null;
+    let current = Number.isFinite(parsed) ? parsed : null;
+    // Snap a legacy off-grid value (e.g. carbs of 12) to the nearest step so
+    // the wheel opens on a real option instead of falling back to the minimum.
+    if (current != null && step > 1)
+      current = Math.round(current / step) * step;
     input.blur();
     openWheelPicker({
       min,
       max,
+      step,
       value: current,
       label,
       onPick: (picked) => {
@@ -113,11 +132,23 @@ const els = {
   tabMetrics: $("tab-metrics"),
   logView: $("log-view"),
   metricsView: $("metrics-view"),
+  historyMore: $("history-more"),
+  weeklyReviewBtn: $("weekly-review"),
+  themeSelect: $("theme-select"),
+  gdriveStatus: $("gdrive-status"),
+  gdriveClientId: $("gdrive-client-id"),
+  gdriveConnectBtn: $("gdrive-connect"),
+  gdriveBackupBtn: $("gdrive-backup"),
+  gdriveRestoreBtn: $("gdrive-restore"),
+  gdriveInfo: $("gdrive-info"),
+  chartModeBtns: document.querySelectorAll(".chart-mode button"),
 };
 
 let pending = null;
 let activeTab = "log";
 let chartRange = "week";
+let chartMode = "both";
+let historyExpanded = false;
 
 const RANGE_DAYS = { week: 7, month: 30, quarter: 90, year: 365 };
 
@@ -584,6 +615,8 @@ async function onImportFile(e) {
   els.importInput.value = "";
 }
 
+const HISTORY_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
 function renderHistory(readings) {
   els.history.innerHTML = "";
   els.historyCount.textContent =
@@ -592,7 +625,23 @@ function renderHistory(readings) {
       : `${readings.length} reading${readings.length === 1 ? "" : "s"}`;
   els.historyEmpty.classList.toggle("hidden", readings.length > 0);
 
-  for (const r of readings) {
+  // Default to the current week; "Show older" reveals the rest (#2).
+  const weekCutoff = Date.now() - HISTORY_WEEK_MS;
+  const olderCount = readings.filter((r) => r.timestamp < weekCutoff).length;
+  const visible = historyExpanded
+    ? readings
+    : readings.filter((r) => r.timestamp >= weekCutoff);
+
+  if (olderCount > 0) {
+    els.historyMore.classList.remove("hidden");
+    els.historyMore.textContent = historyExpanded
+      ? "Show less"
+      : `Show ${olderCount} older reading${olderCount === 1 ? "" : "s"}`;
+  } else {
+    els.historyMore.classList.add("hidden");
+  }
+
+  for (const r of visible) {
     const li = document.createElement("li");
     li.dataset.id = r.id;
     const cls = r.glucose_mmol > 7.8 ? "hi" : r.glucose_mmol < 4.0 ? "lo" : "";
@@ -735,7 +784,7 @@ async function refresh() {
   renderHistory(readings);
   renderLastReadingBadge(readings);
   const days = daysForRange(chartRange, readings);
-  renderChart(els.chart, readings, { days });
+  renderChart(els.chart, readings, { days, mode: chartMode });
   renderChartSummary(readings, days);
   if (activeTab === "metrics") {
     await renderMetrics(els.metricsView);
@@ -764,7 +813,105 @@ function openSettings() {
   els.syncToken.value = s.token;
   els.syncToggleError.classList.add("hidden");
   els.syncPending.textContent = `${getOutboxCount()} readings pending sync`;
+  const g = getGdriveConfig();
+  els.gdriveClientId.value = g.clientId || "";
+  updateGdriveStatus();
   els.settingsOverlay.classList.remove("hidden");
+}
+
+function updateGdriveStatus() {
+  const g = getGdriveConfig();
+  const connected = gdriveConnected();
+  els.gdriveConnectBtn.textContent = connected ? "Disconnect" : "Connect";
+  els.gdriveStatus.textContent = connected
+    ? "Connected"
+    : g.enabled
+      ? "Enabled — signs in when needed"
+      : "Not connected";
+  const last = getLastSync();
+  els.gdriveInfo.textContent = last
+    ? `Last backup ${formatTime(last)}`
+    : "No backup yet.";
+}
+
+async function onGdriveConnect() {
+  const g = getGdriveConfig();
+  const clientId = els.gdriveClientId.value.trim();
+  saveGdriveConfig({ ...g, clientId });
+  if (gdriveConnected()) {
+    gdriveDisconnect();
+    showToast("Google Drive disconnected");
+    updateGdriveStatus();
+    return;
+  }
+  try {
+    await gdriveConnect();
+    showToast("Google Drive connected");
+    updateGdriveStatus();
+    await backupNow();
+    updateGdriveStatus();
+  } catch (err) {
+    showToast(err.message || "Connect failed");
+    updateGdriveStatus();
+  }
+}
+
+async function onGdriveBackup() {
+  try {
+    const { count } = await backupNow();
+    showToast(`Backed up ${count} readings`);
+    updateGdriveStatus();
+  } catch (err) {
+    showToast(err.message || "Backup failed");
+  }
+}
+
+async function onGdriveRestore() {
+  if (
+    !confirm(
+      "Restore from Google Drive? Existing readings are kept — only missing ones are added.",
+    )
+  )
+    return;
+  try {
+    const res = await restoreFromDrive();
+    if (res.empty) {
+      showToast("No backup found in Drive");
+      return;
+    }
+    showToast(`Restored ${res.imported}, skipped ${res.skipped}`);
+    await refresh();
+    updateGdriveStatus();
+  } catch (err) {
+    showToast(err.message || "Restore failed");
+  }
+}
+
+async function onWeeklyReview() {
+  try {
+    await copyWeeklyReview();
+    showToast("Weekly review copied to clipboard");
+  } catch (err) {
+    showToast("Could not copy review");
+    console.error(err);
+  }
+}
+
+function setupTheme() {
+  initTheme();
+  els.themeSelect.innerHTML = "";
+  for (const t of THEMES) {
+    const opt = document.createElement("option");
+    opt.value = t.id;
+    opt.textContent = t.label;
+    els.themeSelect.appendChild(opt);
+  }
+  els.themeSelect.value = getTheme();
+  els.themeSelect.addEventListener("change", () => {
+    saveTheme(els.themeSelect.value);
+    // Re-render so SVG chart picks up the new themed CSS variables.
+    refresh();
+  });
 }
 
 function closeSettings() {
@@ -842,18 +989,44 @@ function bind() {
     chartRange = els.chartRange.value;
     refresh();
   });
+  els.chartModeBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      chartMode = btn.dataset.mode;
+      els.chartModeBtns.forEach((b) =>
+        b.classList.toggle("is-active", b === btn),
+      );
+      refresh();
+    });
+  });
+  els.historyMore.addEventListener("click", () => {
+    historyExpanded = !historyExpanded;
+    refresh();
+  });
+  els.weeklyReviewBtn.addEventListener("click", onWeeklyReview);
+  els.gdriveConnectBtn.addEventListener("click", onGdriveConnect);
+  els.gdriveBackupBtn.addEventListener("click", onGdriveBackup);
+  els.gdriveRestoreBtn.addEventListener("click", onGdriveRestore);
+  els.gdriveClientId.addEventListener("change", () => {
+    const g = getGdriveConfig();
+    saveGdriveConfig({ ...g, clientId: els.gdriveClientId.value.trim() });
+  });
 }
 
 async function init() {
   bind();
+  setupTheme();
   await refresh();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
   drainOutbox();
+  maybeDailySync();
   window.addEventListener("online", () => drainOutbox());
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") drainOutbox();
+    if (document.visibilityState === "visible") {
+      drainOutbox();
+      maybeDailySync();
+    }
   });
   setInterval(
     () => {
