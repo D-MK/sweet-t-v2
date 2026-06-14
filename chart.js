@@ -5,8 +5,14 @@ import {
   LO_THRESHOLD,
   HI_THRESHOLD,
 } from "./config.js";
+import { isMgdl, MMOL_TO_MGDL, fmtThreshold } from "./prefs.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+// Format a glucose y-axis value (held internally in mmol/L) for the active unit.
+function fmtAxis(mmol) {
+  return isMgdl() ? String(Math.round(mmol * MMOL_TO_MGDL)) : mmol.toFixed(1);
+}
 
 const PAD = { top: 14, right: 30, bottom: 22, left: 30 };
 const W = 520;
@@ -151,7 +157,7 @@ export function renderChart(
             fill: "var(--muted)",
             "font-size": 10,
           },
-          v.toFixed(1),
+          fmtAxis(v),
         ),
       );
     }
@@ -180,7 +186,7 @@ export function renderChart(
             "font-size": 9,
             opacity: 0.8,
           },
-          TARGET.toString(),
+          fmtThreshold(TARGET),
         ),
       );
     }

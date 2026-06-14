@@ -36,7 +36,7 @@
   <main>
     <div id="log-view" class="tab-panel" role="tabpanel" aria-labelledby="tab-log">
     <section class="card calc">
-      <label for="glucose">Glucose <span class="muted">(mmol/L)</span></label>
+      <label for="glucose">Glucose <span id="glucose-unit-label" class="muted">(mmol/L)</span></label>
       <div class="input-row">
         <input id="glucose" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 7.2" autofocus />
         <button id="calc" type="button">Calculate</button>
@@ -202,6 +202,19 @@
         <div class="settings-field">
           <label for="theme-select">Theme</label>
           <select id="theme-select" class="settings-select" aria-label="Theme"></select>
+        </div>
+        <div class="settings-field">
+          <label for="unit-select">Glucose units</label>
+          <select id="unit-select" class="settings-select" aria-label="Glucose units"></select>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Insulin</h3>
+        <div class="settings-field">
+          <label for="lantus-default">Default Lantus dose (u)</label>
+          <input id="lantus-default" type="number" inputmode="numeric" min="0" max="60" step="1" placeholder="28" />
+          <p class="muted small">The Lantus wheel opens on this value so you barely scroll. The field still starts empty — nothing is logged until you confirm.</p>
         </div>
       </section>
 

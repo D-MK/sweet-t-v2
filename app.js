@@ -30,6 +30,22 @@ import {
   getLastSync,
 } from "./gdrive.js";
 import { copyWeeklyReview } from "./weekly.js";
+import {
+  UNITS,
+  getUnit,
+  saveUnit,
+  isMgdl,
+  unitLabel,
+  glucoseStep,
+  glucosePlaceholder,
+  fmtGlucose,
+  fmtGlucoseUnit,
+  fmtThreshold,
+  parseGlucoseToMmol,
+  getLantusDefault,
+  saveLantusDefault,
+} from "./prefs.js";
+import { TARGET } from "./config.js";
 
 const DOSE_RANGES = {
   humalog: { min: 0, max: 40, label: "Humalog (u)" },
@@ -50,6 +66,11 @@ function bindWheelInput(input, kind) {
     if (e) e.preventDefault();
     const parsed = parseInt(input.value, 10);
     let current = Number.isFinite(parsed) ? parsed : null;
+    // Lantus is a fixed once-daily basal — open the wheel on the user's default
+    // (e.g. 28) when the field is empty so they barely scroll. The field itself
+    // stays empty until they tap Done, so glucose-only readings log no phantom
+    // basal.
+    if (current == null && kind === "lantus") current = getLantusDefault();
     // Snap a legacy off-grid value (e.g. carbs of 12) to the nearest step so
     // the wheel opens on a real option instead of falling back to the minimum.
     if (current != null && step > 1)
@@ -135,6 +156,9 @@ const els = {
   historyMore: $("history-more"),
   weeklyReviewBtn: $("weekly-review"),
   themeSelect: $("theme-select"),
+  unitSelect: $("unit-select"),
+  lantusDefault: $("lantus-default"),
+  glucoseUnitLabel: $("glucose-unit-label"),
   gdriveStatus: $("gdrive-status"),
   gdriveClientId: $("gdrive-client-id"),
   gdriveConnectBtn: $("gdrive-connect"),
@@ -168,6 +192,23 @@ function daysForRange(range, readings) {
 const LOW_GLUCOSE_MMOL = 4;
 // At or below this level, no correction dose is recommended (won't be injecting).
 const NO_INSULIN_MMOL = 6.5;
+
+// Carb-treatment ratio: 10 g of fast carbs raises glucose by ~40 mg/dL.
+const MGDL_PER_10G_CARB = 40;
+// When low, recommend enough carbs to recover toward the personal target.
+const CARB_RECOVERY_TARGET_MMOL = TARGET; // 6 mmol/L (108 mg/dL)
+const MIN_CARB_TREATMENT_G = 5;
+
+// Grams of fast carbs to bring a low glucose (mg/dL) back to the recovery
+// target, rounded to the nearest 5 g with a sensible floor.
+function carbTreatmentGrams(currentMgdl) {
+  if (!Number.isFinite(currentMgdl)) return 0;
+  const targetMgdl = CARB_RECOVERY_TARGET_MMOL * 18;
+  const deficit = targetMgdl - currentMgdl;
+  if (deficit <= 0) return 0;
+  const grams = (deficit / MGDL_PER_10G_CARB) * 10;
+  return Math.max(MIN_CARB_TREATMENT_G, Math.round(grams / 5) * 5);
+}
 
 function calculateInsulin(mmol) {
   const mgdl = mmol * 18;
@@ -226,13 +267,39 @@ function showToast(msg) {
   showToast._t = setTimeout(() => els.toast.classList.remove("show"), 1800);
 }
 
+// Render the result panel's text (insulin units, formula, carb advice) from a
+// mmol/L glucose value. Pure display — never touches the dose inputs — so it can
+// also refresh the panel when the display unit changes mid-entry.
+function renderResult(mmol) {
+  const { mgdl, insulin, recommend } = calculateInsulin(mmol);
+  els.resultUnits.textContent = insulin.toFixed(1);
+  const mg = mgdl.toFixed(0);
+  // In mg/dL mode the entered value already IS the mg/dL term — don't repeat it.
+  const lead = isMgdl()
+    ? `${mg} mg/dL`
+    : `${fmtGlucoseUnit(mmol)} → ${mg} mg/dL`;
+  els.resultFormula.textContent = recommend
+    ? `${lead} → (${mg} − 80) ÷ 40`
+    : `${fmtGlucoseUnit(mmol)} is at or below ${fmtThreshold(NO_INSULIN_MMOL)} ${unitLabel()} — no correction dose.`;
+  const isLow = mmol < LOW_GLUCOSE_MMOL;
+  if (isLow) {
+    const grams = carbTreatmentGrams(mgdl);
+    const recover = `${fmtThreshold(CARB_RECOVERY_TARGET_MMOL)} ${unitLabel()}`;
+    els.carbAdvice.textContent = `⚠ Below ${fmtThreshold(LOW_GLUCOSE_MMOL)} ${unitLabel()} — eat ~${grams} g fast carbs now to recover toward ${recover}.`;
+  } else {
+    els.carbAdvice.textContent = "";
+  }
+  els.carbAdvice.classList.toggle("hidden", !isLow);
+  return { mgdl, insulin, recommend };
+}
+
 function onCalc() {
-  const v = parseFloat(els.glucose.value);
-  if (!Number.isFinite(v) || v <= 0) {
+  const v = parseGlucoseToMmol(els.glucose.value);
+  if (v == null) {
     showToast("Enter a glucose value");
     return;
   }
-  const { mgdl, insulin, recommend } = calculateInsulin(v);
+  const { mgdl, insulin, recommend } = renderResult(v);
   pending = {
     id: crypto.randomUUID(),
     glucose_mmol: v,
@@ -241,15 +308,6 @@ function onCalc() {
     timestamp: Date.now(),
     note: "",
   };
-  const isLow = v < LOW_GLUCOSE_MMOL;
-  els.resultUnits.textContent = pending.insulin.toFixed(1);
-  els.resultFormula.textContent = recommend
-    ? `${v} × 18 = ${mgdl.toFixed(0)} mg/dL → (${mgdl.toFixed(0)} − 80) ÷ 40`
-    : `${v} mmol/L is at or below ${NO_INSULIN_MMOL} — no correction dose.`;
-  els.carbAdvice.textContent = isLow
-    ? "⚠ Below 4 mmol/L — eat 1 bread unit (10 g carbohydrate) now."
-    : "";
-  els.carbAdvice.classList.toggle("hidden", !isLow);
   els.result.classList.remove("hidden");
   els.timestampToggle.checked = false;
   els.timestampInput.hidden = true;
@@ -386,8 +444,10 @@ async function onEditSave(id) {
 
   const glucoseRaw = glucoseInput.value.trim();
   const hasGlucose = glucoseRaw !== "";
-  const glucose = parseFloat(glucoseRaw);
-  if (hasGlucose && (!Number.isFinite(glucose) || glucose <= 0)) {
+  // parseGlucoseToMmol interprets the field in the active display unit and
+  // returns mmol/L (the canonical stored unit) or null when invalid.
+  const glucose = parseGlucoseToMmol(glucoseRaw);
+  if (hasGlucose && glucose == null) {
     showToast("Invalid glucose value");
     return;
   }
@@ -547,9 +607,7 @@ function showImportModal(readings) {
     const div = document.createElement("div");
     div.className = "import-preview-row";
     const glucoseLabel =
-      r.glucose_mmol != null
-        ? `${r.glucose_mmol.toFixed(1)} mmol/L`
-        : "Insulin only";
+      r.glucose_mmol != null ? fmtGlucoseUnit(r.glucose_mmol) : "Insulin only";
     const doseLabel =
       [
         r.humalog_units != null ? `${fmtDose(r.humalog_units)}u H` : null,
@@ -652,8 +710,8 @@ function renderHistory(readings) {
       li.innerHTML = `
         <div class="edit-mode">
           <div class="edit-field">
-            <label class="small muted">Glucose (mmol/L)</label>
-            <input type="number" data-field="glucose" value="${hasGlucose ? r.glucose_mmol : ""}" step="0.1" min="0" placeholder="(insulin only)" />
+            <label class="small muted">Glucose (${unitLabel()})</label>
+            <input type="number" data-field="glucose" value="${hasGlucose ? fmtGlucose(r.glucose_mmol) : ""}" step="${glucoseStep()}" min="0" placeholder="(insulin only)" />
           </div>
           <div class="edit-field">
             <label class="small muted">Humalog (u)</label>
@@ -684,7 +742,7 @@ function renderHistory(readings) {
     } else {
       const glucoseHtml =
         r.glucose_mmol != null
-          ? `<div class="glucose ${cls}">${r.glucose_mmol.toFixed(1)} <span class="muted small">mmol/L</span></div>`
+          ? `<div class="glucose ${cls}">${fmtGlucose(r.glucose_mmol)} <span class="muted small">${unitLabel()}</span></div>`
           : `<div class="glucose insulin-only-label">Insulin only</div>`;
       const doseParts = [];
       if (r.humalog_units != null)
@@ -756,7 +814,7 @@ function renderLastReadingBadge(readings) {
   const r = readings[0];
   const label =
     r.glucose_mmol != null
-      ? r.glucose_mmol.toFixed(1)
+      ? fmtGlucose(r.glucose_mmol)
       : [
           r.humalog_units != null ? `${fmtDose(r.humalog_units)}u H` : null,
           r.lantus_units != null ? `${fmtDose(r.lantus_units)}u L` : null,
@@ -776,7 +834,7 @@ function renderChartSummary(readings, days) {
     return;
   }
   const avg = recent.reduce((s, r) => s + r.glucose_mmol, 0) / recent.length;
-  els.chartSummary.textContent = `${recent.length} readings · avg ${avg.toFixed(1)}`;
+  els.chartSummary.textContent = `${recent.length} readings · avg ${fmtGlucose(avg)}`;
 }
 
 async function refresh() {
@@ -815,6 +873,8 @@ function openSettings() {
   els.syncPending.textContent = `${getOutboxCount()} readings pending sync`;
   const g = getGdriveConfig();
   els.gdriveClientId.value = g.clientId || "";
+  els.unitSelect.value = getUnit();
+  els.lantusDefault.value = String(getLantusDefault());
   updateGdriveStatus();
   els.settingsOverlay.classList.remove("hidden");
 }
@@ -914,11 +974,48 @@ function setupTheme() {
   });
 }
 
+// Apply the active glucose unit to the static input affordances (label,
+// placeholder, step). History/chart/metrics re-render via refresh().
+function applyGlucoseUnit() {
+  els.glucoseUnitLabel.textContent = `(${unitLabel()})`;
+  els.glucose.setAttribute("step", String(glucoseStep()));
+  els.glucose.setAttribute("placeholder", glucosePlaceholder());
+}
+
+function setupUnits() {
+  els.unitSelect.innerHTML = "";
+  for (const u of UNITS) {
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = u.label;
+    els.unitSelect.appendChild(opt);
+  }
+  els.unitSelect.value = getUnit();
+  applyGlucoseUnit();
+  els.unitSelect.addEventListener("change", () => {
+    const next = els.unitSelect.value;
+    if (next === getUnit()) return;
+    // Parse the typed value in the OLD unit (before saveUnit) so it survives the
+    // switch meaning the same glucose level, then re-format it in the new unit.
+    const typedMmol = parseGlucoseToMmol(els.glucose.value);
+    saveUnit(next);
+    applyGlucoseUnit();
+    if (typedMmol != null) els.glucose.value = fmtGlucose(typedMmol);
+    // Refresh the open result panel's text in the new unit — without touching
+    // any doses already entered there.
+    if (pending) renderResult(pending.glucose_mmol);
+    refresh();
+  });
+}
+
 function closeSettings() {
   els.settingsOverlay.classList.add("hidden");
 }
 
 function onSettingsSave() {
+  // Persist the Lantus default first so it survives the sync-validation early
+  // returns below. Normalise the field to the saved (clamped) value.
+  els.lantusDefault.value = String(saveLantusDefault(els.lantusDefault.value));
   const enabled = els.syncEnabled.checked;
   const baseUrl = els.syncUrl.value.trim();
   const token = els.syncToken.value.trim();
@@ -1015,6 +1112,7 @@ function bind() {
 async function init() {
   bind();
   setupTheme();
+  setupUnits();
   await refresh();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
