@@ -11,6 +11,13 @@ import {
   LO_THRESHOLD,
   HI_THRESHOLD,
 } from "./config.js";
+import {
+  fmtGlucose,
+  fmtThreshold,
+  unitLabel,
+  toDisplay,
+  isMgdl,
+} from "./prefs.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
@@ -80,19 +87,36 @@ function delta(a, b, digits = 1) {
   return `${sign}${d.toFixed(digits)}`;
 }
 
+// Glucose value (mmol/L internally) formatted in the active display unit.
+function fmtBg(mmol) {
+  return mmol == null ? "—" : fmtGlucose(mmol);
+}
+
+// Week-on-week glucose delta in the active display unit. Convert the mmol
+// difference once (toDisplay rounds for mg/dL) to avoid double-rounding.
+function deltaBg(a, b) {
+  if (a == null || b == null) return "n/a";
+  const d = toDisplay(a - b);
+  const sign = d > 0 ? "+" : "";
+  return `${sign}${isMgdl() ? d : d.toFixed(1)}`;
+}
+
 // Produce a markdown prompt suitable for pasting into an LLM.
 export function weeklyReviewPrompt(review) {
   const t = review.thisWeek;
   const l = review.lastWeek;
-  return `You are a diabetes self-management coach. Compare these two weeks of glucose/insulin logs and give me a short, practical review. Target glucose is ${review.target} mmol/L (in-band ${review.band[0]}–${review.band[1]}). Focus on: week-on-week changes, any time-of-day patterns I should watch, and 2-3 concrete things to try to get closer to ${review.target}. Be direct, no medical disclaimers.
+  const unit = unitLabel();
+  const targetStr = fmtThreshold(review.target);
+  const bandStr = `${fmtThreshold(review.band[0])}–${fmtThreshold(review.band[1])}`;
+  return `You are a diabetes self-management coach. Compare these two weeks of glucose/insulin logs and give me a short, practical review. Target glucose is ${targetStr} ${unit} (in-band ${bandStr}). Focus on: week-on-week changes, any time-of-day patterns I should watch, and 2-3 concrete things to try to get closer to ${targetStr}. Be direct, no medical disclaimers.
 
 | Metric | This week | Last week | Δ |
 |---|---|---|---|
 | Glucose readings | ${t.glucoseReadings} | ${l.glucoseReadings} | ${delta(t.glucoseReadings, l.glucoseReadings, 0)} |
-| Avg glucose (mmol/L) | ${fmt(t.avgGlucose)} | ${fmt(l.avgGlucose)} | ${delta(t.avgGlucose, l.avgGlucose)} |
-| Time in band ${review.band[0]}–${review.band[1]} (%) | ${fmt(t.timeInBandPct, 0)} | ${fmt(l.timeInBandPct, 0)} | ${delta(t.timeInBandPct, l.timeInBandPct, 0)} |
-| Lows (<${LO_THRESHOLD}) | ${t.lows} | ${l.lows} | ${delta(t.lows, l.lows, 0)} |
-| Highs (>${HI_THRESHOLD}) | ${t.highs} | ${l.highs} | ${delta(t.highs, l.highs, 0)} |
+| Avg glucose (${unit}) | ${fmtBg(t.avgGlucose)} | ${fmtBg(l.avgGlucose)} | ${deltaBg(t.avgGlucose, l.avgGlucose)} |
+| Time in band ${bandStr} (%) | ${fmt(t.timeInBandPct, 0)} | ${fmt(l.timeInBandPct, 0)} | ${delta(t.timeInBandPct, l.timeInBandPct, 0)} |
+| Lows (<${fmtThreshold(LO_THRESHOLD)} ${unit}) | ${t.lows} | ${l.lows} | ${delta(t.lows, l.lows, 0)} |
+| Highs (>${fmtThreshold(HI_THRESHOLD)} ${unit}) | ${t.highs} | ${l.highs} | ${delta(t.highs, l.highs, 0)} |
 | Avg daily Humalog (u) | ${fmt(t.avgDailyHumalog)} | ${fmt(l.avgDailyHumalog)} | ${delta(t.avgDailyHumalog, l.avgDailyHumalog)} |
 | Avg daily Lantus (u) | ${fmt(t.avgDailyLantus)} | ${fmt(l.avgDailyLantus)} | ${delta(t.avgDailyLantus, l.avgDailyLantus)} |
 | Avg daily carbs (g) | ${fmt(t.avgDailyCarbs, 0)} | ${fmt(l.avgDailyCarbs, 0)} | ${delta(t.avgDailyCarbs, l.avgDailyCarbs, 0)} |

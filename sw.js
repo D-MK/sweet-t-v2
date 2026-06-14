@@ -1,4 +1,4 @@
-const CACHE = "sweet-t-v3";
+const CACHE = "sweet-t-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const ASSETS = [
   "./sync.js",
   "./config.js",
   "./theme.js",
+  "./prefs.js",
   "./gdrive.js",
   "./weekly.js",
   "./manifest.webmanifest",

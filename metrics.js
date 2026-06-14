@@ -7,6 +7,7 @@ import {
   HI_THRESHOLD,
   glucoseColour,
 } from "./config.js";
+import { fmtGlucose, fmtThreshold, unitLabel } from "./prefs.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -147,10 +148,10 @@ function renderCard(window) {
   grid.className = "metrics-grid";
 
   const hba1cValue = window.estHba1c != null ? fmt1(window.estHba1c) : "—";
-  const minValue = window.minMmol != null ? fmt1(window.minMmol) : "—";
-  const maxValue = window.maxMmol != null ? fmt1(window.maxMmol) : "—";
+  const minValue = window.minMmol != null ? fmtGlucose(window.minMmol) : "—";
+  const maxValue = window.maxMmol != null ? fmtGlucose(window.maxMmol) : "—";
   const glucoseUnit = window.estHba1c != null ? "% est." : "";
-  const mmolUnit = window.minMmol != null ? "mmol/L" : "";
+  const bgUnit = window.minMmol != null ? unitLabel() : "";
 
   const humalogValue =
     window.avgDailyHumalog != null ? fmt1(window.avgDailyHumalog) : "—";
@@ -167,8 +168,8 @@ function renderCard(window) {
     window.avgDailyCarbs != null ? overDays(window.carbsDays) : null;
 
   grid.appendChild(metricCell("HbA1c", hba1cValue, glucoseUnit));
-  grid.appendChild(metricCell("Min glucose", minValue, mmolUnit));
-  grid.appendChild(metricCell("Max glucose", maxValue, mmolUnit));
+  grid.appendChild(metricCell("Min glucose", minValue, bgUnit));
+  grid.appendChild(metricCell("Max glucose", maxValue, bgUnit));
   grid.appendChild(
     metricCell("Avg daily Humalog", humalogValue, "u", humalogSub),
   );
@@ -259,7 +260,7 @@ function renderHeatmap(readings, now = Date.now()) {
       } else {
         cell.className = "heat-cell heat-hot";
         cell.style.background = glucoseColour(avg);
-        cell.textContent = fmt1(avg);
+        cell.textContent = fmtGlucose(avg);
       }
       row.appendChild(cell);
     }
@@ -274,7 +275,7 @@ function renderHeatmap(readings, now = Date.now()) {
     <span class="heat-swatch" style="background:var(--danger)"></span>
     <span class="muted small">Low</span>
     <span class="heat-swatch" style="background:var(--good)"></span>
-    <span class="muted small">Target ${TARGET_LOW}–${TARGET_HIGH}</span>
+    <span class="muted small">Target ${fmtThreshold(TARGET_LOW)}–${fmtThreshold(TARGET_HIGH)} ${unitLabel()}</span>
     <span class="heat-swatch" style="background:var(--warn)"></span>
     <span class="muted small">High</span>
     <span class="muted small">· blank = no data</span>

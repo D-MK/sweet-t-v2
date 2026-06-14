@@ -95,6 +95,18 @@
         { "task": "#11 Light mode + themes (dark/light/ocean/sunset/midnight) via [data-theme]", "status": "done" },
         { "task": "Critic review pass + node --check all modules + open PR", "status": "in_progress" }
       ]
+    },
+    {
+      "id": 8,
+      "name": "Lantus default + scaled carb advice + unit switch",
+      "status": "done",
+      "note": "Branch feat/sweet-t-improvements. New prefs.js module (mirrors theme.js) holds glucose unit + lantus default; clinical constants stay mmol in config.js, prefs.js is the only mmol<->mgdl converter for display/input.",
+      "tasks": [
+        { "task": "Lantus wheel opens on a user-set default (28) when empty; field stays empty until Done so glucose-only readings log no phantom basal", "status": "done" },
+        { "task": "Low-glucose carb advice scales to the deficit (10g carbs ~= 40 mg/dL), recovering toward the 6 mmol/L target, rounded to 5g", "status": "done" },
+        { "task": "Glucose unit switch mmol/L <-> mg/dL (Settings): input, history, chart axis, metrics, heatmap, weekly review, badges, import preview all unit-aware; mid-entry switch converts the typed value", "status": "done" },
+        { "task": "Verify: node --check all modules + Chrome DevTools smoke (scaled advice in both units, lantus default 28 & custom 40, unit reflow, console clean) + screenshot", "status": "done" }
+      ]
     }
   ]
 }
